@@ -21,9 +21,6 @@ let superSecretValue = keychainItemWrapper["superSecretKey"] as String?
 println("The super secret value is: \(sharedPassword)")
 ```
 
-# Contact
-Follow me on twitter [@mcostea](https://twitter.com/mcostea)
-
 # License
 
 KeychainItemWrapper.swift is released under the MIT license. See LICENSE for details.
