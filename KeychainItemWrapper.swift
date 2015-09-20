@@ -20,6 +20,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+// Fixed issues in Swift2.0 (Xcode 7) by Jungho Bang, 2015
+
 import Foundation
 import Security
 
