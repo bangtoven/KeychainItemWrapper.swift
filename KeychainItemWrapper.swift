@@ -31,34 +31,34 @@ class KeychainItemWrapper {
     var values = [String: AnyObject]()
     
     init(identifier: String, accessGroup: String?) {
-        self.genericPasswordQuery[kSecClass] = kSecClassGenericPassword
-        self.genericPasswordQuery[kSecAttrGeneric] = identifier
+        self.genericPasswordQuery[kSecClass as String] = kSecClassGenericPassword
+        self.genericPasswordQuery[kSecAttrGeneric as String] = identifier
         
         if (accessGroup != nil) {
-            if TARGET_IPHONE_SIMULATOR != 1 {
-                self.genericPasswordQuery[kSecAttrAccessGroup] = accessGroup
+            if TARGET_OS_SIMULATOR != 1 {
+                self.genericPasswordQuery[kSecAttrAccessGroup as String] = accessGroup
             }
         }
         
-        self.genericPasswordQuery[kSecMatchLimit] = kSecMatchLimitOne
-        self.genericPasswordQuery[kSecReturnAttributes] = kCFBooleanTrue
+        self.genericPasswordQuery[kSecMatchLimit as String] = kSecMatchLimitOne
+        self.genericPasswordQuery[kSecReturnAttributes as String] = kCFBooleanTrue
         
         let tempQuery = self.genericPasswordQuery as NSDictionary
-        var outDict: Unmanaged<AnyObject>?
+        var outDict: AnyObject?
         
         let copyMatchingResult = SecItemCopyMatching(tempQuery as CFDictionary, &outDict)
         
         if copyMatchingResult != noErr {
             self.resetKeychain()
             
-            self.keychainItemData[kSecAttrGeneric] = identifier
+            self.keychainItemData[kSecAttrGeneric as String] = identifier
             if (accessGroup != nil) {
                 if TARGET_IPHONE_SIMULATOR != 1 {
-                    self.keychainItemData[kSecAttrAccessGroup] = accessGroup
+                    self.keychainItemData[kSecAttrAccessGroup as String] = accessGroup
                 }
             }
         } else {
-            self.keychainItemData = self.secItemDataToDict(outDict!.takeRetainedValue() as [String: AnyObject])
+            self.keychainItemData = self.secItemDataToDict(outDict as! [String: AnyObject])
         }
     }
     
@@ -73,21 +73,34 @@ class KeychainItemWrapper {
         }
     }
     
+    func objectForKey(key: String) -> AnyObject? {
+        return self.values[key]
+    }
+    
+    func setObject(newValue: AnyObject?, forKey key: String) {
+        self.values[key] = newValue
+        self.writeKeychainData()
+    }
+    
+    func resetKeychainItem() {
+        self.resetKeychain()
+    }
+    
     func resetKeychain() {
         
         if !self.keychainItemData.isEmpty {
             let tempDict = self.dictToSecItemData(self.keychainItemData)
             var junk = noErr
             junk = SecItemDelete(tempDict as CFDictionary)
-        
+            
             assert(junk == noErr || junk == errSecItemNotFound, "Failed to delete current dict")
         }
         
-        self.keychainItemData[kSecAttrAccount] = ""
-        self.keychainItemData[kSecAttrLabel] = ""
-        self.keychainItemData[kSecAttrDescription] = ""
+        self.keychainItemData[kSecAttrAccount as String] = ""
+        self.keychainItemData[kSecAttrLabel as String] = ""
+        self.keychainItemData[kSecAttrDescription as String] = ""
         
-        self.keychainItemData[kSecValueData] = ""
+        self.keychainItemData[kSecValueData as String] = ""
     }
     
     private func secItemDataToDict(data: [String: AnyObject]) -> [String: AnyObject] {
@@ -96,27 +109,31 @@ class KeychainItemWrapper {
             returnDict[key] = value
         }
         
-        returnDict[kSecReturnData] = kCFBooleanTrue
-        returnDict[kSecClass] = kSecClassGenericPassword
+        returnDict[kSecReturnData as String] = kCFBooleanTrue
+        returnDict[kSecClass as String] = kSecClassGenericPassword
         
-        var passwordData: Unmanaged<AnyObject>?
+        var passwordData: AnyObject?
         
         // We could use returnDict like the Apple example but this crashes the app with swift_unknownRelease
         // when we try to access returnDict again
-        var queryDict = returnDict
+        let queryDict = returnDict
         
         let copyMatchingResult = SecItemCopyMatching(queryDict as CFDictionary, &passwordData)
         
         if copyMatchingResult != noErr {
             assert(false, "No matching item found in keychain")
         } else {
-            let retainedValuesData = passwordData!.takeRetainedValue() as NSData
-            var val = NSJSONSerialization.JSONObjectWithData(retainedValuesData, options: .allZeros, error: nil) as [String: AnyObject]
-            
-            returnDict.removeValueForKey(kSecReturnData)
-            returnDict[kSecValueData] = val
-            
-            self.values = val
+            let retainedValuesData = passwordData as! NSData
+            do {
+                let val = try NSJSONSerialization.JSONObjectWithData(retainedValuesData, options: NSJSONReadingOptions()) as! [String: AnyObject]
+                
+                returnDict.removeValueForKey(kSecReturnData as String)
+                returnDict[kSecValueData as String] = val
+                
+                self.values = val
+            } catch _ {
+                
+            }
         }
         
         return returnDict
@@ -128,15 +145,19 @@ class KeychainItemWrapper {
             returnDict[key] = value
         }
         
-        returnDict[kSecClass] = kSecClassGenericPassword
+        returnDict[kSecClass as String] = kSecClassGenericPassword
         
-        returnDict[kSecValueData] = NSJSONSerialization.dataWithJSONObject(self.values, options: .allZeros, error: nil)
+        do {
+            try returnDict[kSecValueData as String] = NSJSONSerialization.dataWithJSONObject(self.values, options: NSJSONWritingOptions())
+        } catch _ {
+            
+        }
         
         return returnDict
     }
     
     private func writeKeychainData() {
-        var attributes: Unmanaged<AnyObject>?
+        var attributes: AnyObject?
         var updateItem: [String: AnyObject]?
         
         var result: OSStatus?
@@ -148,16 +169,16 @@ class KeychainItemWrapper {
             assert(result == noErr, "Failed to add keychain item")
         } else {
             updateItem = [String: AnyObject]()
-            for (key, value) in attributes!.takeRetainedValue() as [String: AnyObject] {
+            for (key, value) in attributes as! [String: AnyObject] {
                 updateItem![key] = value
             }
-            updateItem![kSecClass] = self.genericPasswordQuery[kSecClass]
+            updateItem![kSecClass as String] = self.genericPasswordQuery[kSecClass as String]
             
             var tempCheck = self.dictToSecItemData(self.keychainItemData)
-            tempCheck.removeValueForKey(kSecClass)
+            tempCheck.removeValueForKey(kSecClass as String)
             
             if TARGET_IPHONE_SIMULATOR == 1 {
-                tempCheck.removeValueForKey(kSecAttrAccessGroup)
+                tempCheck.removeValueForKey(kSecAttrAccessGroup as String)
             }
             
             result = SecItemUpdate(updateItem! as CFDictionary, tempCheck as CFDictionary)
